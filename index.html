@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Socialset</title>
+
+<!-- PWA: manifest + installability -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="background-color" content="#ffffff" />
+<meta name="color-scheme" content="light" />
+
+<!-- Android / Chrome standalone behaviour -->
+<meta name="mobile-web-app-capable" content="yes" />
+
+<!-- iOS standalone + status bar + app title (Safari doesn't fully read the manifest) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Socialset" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png" />
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+
+<!-- iOS splash screen (Safari builds the launch screen from icon + these
+     colours/orientation cues rather than the manifest; this covers the
+     "flash of blank white" that native apps avoid) -->
+<meta name="apple-touch-fullscreen" content="yes" />
+<style>
+  :root{
+    --bg:#ffffff;
+    --card:#f4f4f5;
+    --card-2:#ececee;
+    --ink:#111113;
+    --ink-soft:#6b6b70;
+    --line:#e7e7ea;
+    --accent-1:#ff5c7a;
+    --accent-2:#8a5cff;
+    --accent-grad: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    --radius-lg:22px;
+    --radius-md:16px;
+    --radius-sm:10px;
+    --nav-h:64px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0; background:#e9e9ec; overscroll-behavior:none;}
+  body{display:flex; justify-content:center;}
+  #phone{
+    width:100%; max-width:430px; min-height:100vh; background:var(--bg); color:var(--ink);
+    position:relative; overflow-x:hidden; display:flex; flex-direction:column;
+  }
+  #app{flex:1; display:flex; flex-direction:column; min-height:100vh;}
+  .screen{padding: calc(14px + var(--safe-top)) 18px calc(var(--nav-h) + 24px); flex:1;}
+  h1,h2,h3,p{margin:0;}
+  .app-title{font-size:26px; font-weight:800; letter-spacing:-0.02em;}
+  .subtitle{font-size:13px; color:var(--ink-soft); margin-top:2px;}
+
+  /* Search bar */
+  .searchbar{
+    display:flex; align-items:center; gap:8px; background:var(--card);
+    border-radius:14px; padding:10px 14px; margin-top:16px;
+  }
+  .searchbar input{
+    border:none; background:transparent; outline:none; font-size:15px; width:100%; color:var(--ink);
+  }
+  .searchbar svg{flex-shrink:0; opacity:0.5;}
+
+  /* sort row */
+  .sortrow{display:flex; gap:8px; margin-top:12px; overflow-x:auto; padding-bottom:2px;}
+  .sortrow::-webkit-scrollbar{display:none;}
+  .chip{
+    flex-shrink:0; font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px;
+    background:var(--card); color:var(--ink-soft); border:1px solid transparent; white-space:nowrap;
+  }
+  .chip.active{background:var(--ink); color:#fff;}
+
+  /* Folder cards */
+  .folder-list{margin-top:16px; display:flex; flex-direction:column; gap:14px;}
+  .folder-card{
+    background:var(--card); border-radius:var(--radius-lg); overflow:hidden;
+    display:flex; align-items:stretch; min-height:104px; position:relative;
+    transition: transform .15s ease;
+  }
+  .folder-card:active{transform:scale(0.98);}
+  .fc-cover{
+    width:104px; height:104px; flex-shrink:0; background:var(--card-2);
+    display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .fc-cover img, .fc-cover video{width:100%; height:100%; object-fit:cover;}
+  .fc-body{flex:1; padding:12px 14px; display:flex; flex-direction:column; justify-content:center; min-width:0;}
+  .fc-format{
+    display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700;
+    color:#fff; background:var(--accent-grad); padding:3px 9px; border-radius:999px; width:fit-content;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  .fc-title{font-size:16px; font-weight:700; margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .fc-meta{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
+
+  .empty-state{
+    margin-top:20vh; text-align:center; color:var(--ink-soft);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .empty-state svg{opacity:.35;}
+  .empty-state b{color:var(--ink); font-size:16px;}
+
+  /* FAB */
+  .fab{
+    position:fixed; right:calc(50% - 215px + 20px); bottom:calc(var(--nav-h) + var(--safe-bottom) + 18px);
+    width:58px; height:58px; border-radius:50%; background:var(--accent-grad);
+    display:flex; align-items:center; justify-content:center; border:none; color:#fff;
+    box-shadow: 0 8px 20px rgba(138,92,255,0.35); z-index:20;
+  }
+  @media (max-width:430px){ .fab{ right:20px; } }
+  .fab:active{transform:scale(0.93);}
+
+  /* Bottom nav */
+  .bottomnav{
+    position:fixed; left:0; right:0; bottom:0; margin:0 auto; max-width:430px;
+    height:calc(var(--nav-h) + var(--safe-bottom)); background:rgba(255,255,255,0.92);
+    backdrop-filter: blur(14px); border-top:1px solid var(--line);
+    display:flex; padding-bottom:var(--safe-bottom); z-index:15;
+  }
+  .navbtn{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    background:none; border:none; color:var(--ink-soft); font-size:10.5px; font-weight:600;
+  }
+  .navbtn.active{color:var(--ink);}
+  .navbtn .dot{width:5px; height:5px; border-radius:50%; background:var(--accent-grad); margin-top:1px; opacity:0;}
+  .navbtn.active .dot{opacity:1;}
+
+  /* Modal / sheet */
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:40;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .sheet{
+    background:#fff; width:100%; max-width:430px; border-radius:24px 24px 0 0;
+    padding:10px 20px calc(24px + var(--safe-bottom)); animation:sheetup .22s ease;
+  }
+  @keyframes sheetup{from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:99px; margin:6px auto 14px;}
+  .sheet h3{font-size:18px; font-weight:800; margin-bottom:16px;}
+  .field{margin-bottom:16px;}
+  .field label{font-size:12.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em;}
+  .field select, .field input[type=text]{
+    width:100%; margin-top:8px; padding:14px; border-radius:14px; border:1px solid var(--line);
+    background:var(--card); font-size:15px; color:var(--ink); outline:none; appearance:none;
+  }
+  .btn{
+    width:100%; padding:15px; border-radius:16px; border:none; font-size:15.5px; font-weight:700;
+    background:var(--ink); color:#fff;
+  }
+  .btn:active{opacity:.85;}
+  .btn.secondary{background:var(--card); color:var(--ink); margin-top:10px;}
+  .btn.ghost{background:transparent; color:var(--ink-soft);}
+  .btn[disabled]{opacity:.4;}
+
+  /* Folder view */
+  .fv-header{display:flex; align-items:center; gap:10px; margin-bottom:4px;}
+  .iconbtn{
+    width:38px; height:38px; border-radius:50%; background:var(--card); border:none;
+    display:flex; align-items:center; justify-content:center; color:var(--ink); flex-shrink:0;
+  }
+  .fv-titles{flex:1; min-width:0;}
+  .fv-titles .t{font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .fv-titles .s{font-size:12.5px; color:var(--ink-soft);}
+  .fv-actions{display:flex; gap:8px; margin-top:16px;}
+  .fv-actions .btn{padding:12px; font-size:13.5px;}
+
+  .media-grid{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:3px; margin-top:18px;
+    border-radius:var(--radius-md); overflow:hidden;
+  }
+  .media-cell{
+    position:relative; aspect-ratio:1/1; background:var(--card); overflow:hidden;
+  }
+  .media-cell img, .media-cell video{width:100%; height:100%; object-fit:cover; display:block;}
+  .media-cell .badge{
+    position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.45); color:#fff; border-radius:6px;
+    padding:2px 6px; font-size:9.5px; font-weight:700;
+  }
+  .media-cell .cover-tag{
+    position:absolute; bottom:6px; left:6px; background:var(--accent-grad); color:#fff; border-radius:999px;
+    padding:2px 8px; font-size:9px; font-weight:800; letter-spacing:.03em; text-transform:uppercase;
+  }
+  .media-grid.reorder-active .media-cell{touch-action:none; user-select:none;}
+  .media-cell.draggable{transition: transform .12s ease, opacity .12s ease;}
+  .media-cell.draggable .grip{
+    position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,0.5); color:#fff; display:flex; align-items:center; justify-content:center;
+  }
+  .media-cell.dragging{opacity:0.55; transform:scale(1.06); z-index:5; box-shadow:0 6px 18px rgba(0,0,0,0.3);}
+  .trash-actions{
+    position:absolute; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .trash-actions button{
+    width:30px; height:30px; border-radius:50%; border:none; background:#fff; color:#111; display:flex; align-items:center; justify-content:center;
+  }
+  .media-cell.selected{outline:3px solid var(--accent-2); outline-offset:-3px;}
+  .select-check{
+    position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%;
+    background:rgba(255,255,255,0.85); border:2px solid rgba(0,0,0,0.2);
+    display:flex; align-items:center; justify-content:center; color:var(--accent-2);
+  }
+  .select-check.checked{ background:var(--accent-grad); border-color:transparent; color:#fff; }
+  .media-cell .delete-x{
+    position:absolute; top:5px; right:5px; width:20px; height:20px; border-radius:50%;
+    background:rgba(0,0,0,0.55); color:#fff; border:none; display:flex; align-items:center; justify-content:center;
+  }
+
+  .empty-media{margin-top:40px; text-align:center; color:var(--ink-soft);}
+  .empty-media b{color:var(--ink);}
+
+  /* fullscreen viewer */
+  .fullscreen{
+    position:fixed; inset:0; background:#000; z-index:60; display:flex; flex-direction:column;
+  }
+  .fullscreen .top{display:flex; justify-content:flex-end; padding:calc(14px + var(--safe-top)) 14px 10px;}
+  .fullscreen .stage{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .fullscreen img, .fullscreen video{max-width:100%; max-height:100%; object-fit:contain;}
+  .fullscreen .close{width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; color:#fff; display:flex; align-items:center; justify-content:center;}
+  .fullscreen .bottom{padding:14px 20px calc(20px + var(--safe-bottom)); display:flex; gap:10px;}
+  .fullscreen .bottom .btn{background:rgba(255,255,255,0.12); color:#fff;}
+
+  /* settings */
+  .settings-row{
+    display:flex; justify-content:space-between; align-items:center; padding:16px 0; border-bottom:1px solid var(--line);
+  }
+  .settings-row .label{font-size:15px; font-weight:600;}
+  .settings-row .value{font-size:14px; color:var(--ink-soft);}
+  .settings-group{margin-top:22px;}
+  .settings-group-title{font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;}
+  .soon-pill{font-size:10.5px; font-weight:700; color:#fff; background:#b9b9c0; padding:3px 8px; border-radius:999px;}
+
+  .upload-hint{font-size:11.5px; color:var(--ink-soft); text-align:center; margin-top:10px;}
+
+  /* toast */
+  .toast{
+    position:fixed; bottom:calc(var(--nav-h) + var(--safe-bottom) + 16px); left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:999px; font-size:13.5px; font-weight:600;
+    z-index:70; opacity:0; transition: opacity .2s ease;
+  }
+  .toast.show{opacity:1;}
+
+  ::selection{background: var(--accent-1); color:#fff;}
+</style>
+</head>
+<body>
+<div id="phone">
+  <div id="app"></div>
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+/* =========================================================================
+   SEPARATE SOCIAL — v1 (MVP PWA)
+   ---------------------------------------------------------------
+   ARCHITECTURE OVERVIEW (see README.md for the full writeup)
+
+   UI          -> render()/handlers below, framework-free for a small,
+                  fast, dependency-light MVP.
+   Models      -> Folder, MediaItem (plain objects, documented below).
+   Services    -> FolderService / MediaService wrap StorageProvider with
+                  app-level rules (e.g. "deleting a folder deletes its
+                  media").
+   Storage     -> StorageProvider is the ONLY thing the UI talks to.
+                  It is composed of two independently swappable pieces:
+
+                    1. MetadataStore  — folder + media METADATA only
+                       (IndexedDB today; swap for Firestore/Supabase
+                       Postgres later — same method signatures).
+
+                    2. BlobStore      — the actual photo/video bytes.
+                       Today this uses the browser's Origin Private File
+                       System (OPFS) via navigator.storage.getDirectory(),
+                       which is real "private app storage" sandboxed to
+                       this PWA — not the user's camera roll, not a
+                       regular downloads folder. If OPFS isn't available
+                       (older Safari/WebViews), it falls back to a
+                       dedicated IndexedDB object store that ONLY holds
+                       blobs, so metadata and binary data are still
+                       logically separated. Later, swap this class for
+                       one that uploads to Firebase Storage / Supabase
+                       Storage and returns the same shape of data — the
+                       UI never changes.
+
+   This split (metadata vs. blobs, both hidden behind StorageProvider)
+   is exactly what makes a future cloud-sync version a storage-layer
+   swap instead of an app rewrite.
+   ========================================================================= */
+
+// ---------------------------------------------------------------------
+// MODELS (plain object shapes, documented for reference)
+// ---------------------------------------------------------------------
+// Folder = {
+//   id, title, format ('Reel'|'Carousel'|'Post'|'Story'),
+//   createdDate, updatedDate, coverMediaId, mediaOrder: [mediaId,...]
+// }
+// MediaItem = {
+//   id, folderId, type ('photo'|'video'), filename, createdDate, size
+//   -- blob bytes are NOT stored here, they live in BlobStore under
+//      keys `${id}` (full asset) and `${id}-thumb` (thumbnail)
+// }
+
+// ---------------------------------------------------------------------
+// LOW-LEVEL INDEXEDDB HELPERS (metadata + fallback blob store)
+// ---------------------------------------------------------------------
+const DB_NAME = 'separate-social-db';
+const DB_VERSION = 2;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('folders')) {
+        db.createObjectStore('folders', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('media')) {
+        const s = db.createObjectStore('media', { keyPath: 'id' });
+        s.createIndex('folderId', 'folderId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('blobs')) {
+        // Fallback-only store: used solely when OPFS is unavailable.
+        db.createObjectStore('blobs', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('session')) {
+        // Holds a single record (id: 'current') for the logged-in profile.
+        // This lives in IndexedDB (not localStorage) so it persists the
+        // same reliable way the rest of the app's data does, on-device,
+        // across closing/reopening the app.
+        db.createObjectStore('session', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPut(db, store, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => resolve(value);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbGet(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbDelete(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbGetAll(db, store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGetAllByIndex(db, store, index, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).index(index).getAll(key);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ---------------------------------------------------------------------
+// BLOB STORE — "private app storage" abstraction
+// Tries OPFS first (true sandboxed private storage). Falls back to an
+// IndexedDB-only blob table if OPFS isn't supported. Same public API
+// either way, so a future FirebaseBlobStore / SupabaseBlobStore can be
+// dropped in without touching StorageProvider or the UI.
+// ---------------------------------------------------------------------
+class BlobStore {
+  constructor(db) { this.db = db; this.mode = 'indexeddb'; this.mediaDir = null; }
+  async init() {
+    try {
+      if (navigator.storage && navigator.storage.getDirectory) {
+        const root = await navigator.storage.getDirectory();
+        this.mediaDir = await root.getDirectoryHandle('media', { create: true });
+        this.mode = 'opfs';
+      }
+    } catch (e) {
+      this.mode = 'indexeddb';
+    }
+  }
+  async put(id, blob) {
+    if (this.mode === 'opfs') {
+      // One retry before giving up — WebKit's OPFS implementation
+      // occasionally throws a transient error on rapid back-to-back writes
+      // (e.g. importing several files from one picker selection). A single
+      // retry clears the vast majority of these without the person noticing.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const fh = await this.mediaDir.getFileHandle(id, { create: true });
+          const w = await fh.createWritable();
+          await w.write(blob);
+          await w.close();
+          return;
+        } catch (e) {
+          if (attempt === 1) {
+            console.warn('OPFS write failed twice, falling back to IndexedDB for this file', id, e);
+            break; // fall through to IndexedDB fallback below
+          }
+        }
+      }
+    }
+    await idbPut(this.db, 'blobs', { id, blob });
+  }
+  async get(id) {
+    if (this.mode === 'opfs') {
+      try {
+        const fh = await this.mediaDir.getFileHandle(id);
+        return await fh.getFile();
+      } catch (e) { /* not in OPFS — might have fallen back to IndexedDB when saved */ }
+    }
+    try {
+      const rec = await idbGet(this.db, 'blobs', id);
+      return rec ? rec.blob : null;
+    } catch (e) { return null; }
+  }
+  async delete(id) {
+    if (this.mode === 'opfs') {
+      try { await this.mediaDir.removeEntry(id); } catch (e) { /* not there, ignore */ }
+    }
+    try { await idbDelete(this.db, 'blobs', id); } catch (e) { /* not there, ignore */ }
+  }
+}
+
+// ---------------------------------------------------------------------
+// THUMBNAIL GENERATION
+// ---------------------------------------------------------------------
+async function makeThumbnail(file, type) {
+  // Hard timeout: some phone-recorded videos never fire the events we're
+  // waiting on (metadata/seek quirks vary by codec/device). Without a
+  // timeout, one such file hangs this promise forever — which stalls the
+  // whole import queue, so nothing added after it ever completes. A
+  // timed-out/failed thumbnail just means the item imports without a
+  // preview image; the full-quality media itself is unaffected.
+  return Promise.race([
+    makeThumbnailInner(file, type),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('thumbnail timeout')), 4000))
+  ]);
+}
+
+async function makeThumbnailInner(file, type) {
+  const SIZE = 360;
+  const canvas = document.createElement('canvas');
+  canvas.width = SIZE; canvas.height = SIZE;
+  const ctx = canvas.getContext('2d');
+  let sourceEl;
+  if (type === 'photo') {
+    sourceEl = await createImageBitmap(file);
+  } else {
+    sourceEl = document.createElement('video');
+    sourceEl.src = URL.createObjectURL(file);
+    sourceEl.muted = true; sourceEl.playsInline = true;
+    await new Promise((resolve, reject) => {
+      sourceEl.addEventListener('loadeddata', () => {
+        const d = sourceEl.duration;
+        const seekTo = (isFinite(d) && d > 0) ? Math.min(0.15, d / 2) : 0;
+        try { sourceEl.currentTime = seekTo; } catch (e) { resolve(); }
+      }, { once: true });
+      sourceEl.addEventListener('seeked', resolve, { once: true });
+      sourceEl.addEventListener('error', () => reject(new Error('video load error')), { once: true });
+      sourceEl.load();
+    });
+  }
+  const sw = sourceEl.videoWidth || sourceEl.width;
+  const sh = sourceEl.videoHeight || sourceEl.height;
+  const scale = Math.max(SIZE / sw, SIZE / sh);
+  const dw = sw * scale, dh = sh * scale;
+  ctx.drawImage(sourceEl, (SIZE - dw)/2, (SIZE - dh)/2, dw, dh);
+  if (type === 'video' && sourceEl.src) URL.revokeObjectURL(sourceEl.src);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82));
+}
+
+// ---------------------------------------------------------------------
+// STORAGE PROVIDER — the single interface the UI depends on.
+// Swap MetadataStore/BlobStore implementations here later for cloud
+// sync; every method below keeps the same name + shape.
+// ---------------------------------------------------------------------
+class StorageProvider {
+  constructor(db, blobStore) {
+    this.db = db;
+    this.blobStore = blobStore;
+    this.urlCache = new Map();
+  }
+  // Active (non-trashed) folders only.
+  async getFolders() {
+    const all = await idbGetAll(this.db, 'folders');
+    return all.filter((f) => !f.deletedAt);
+  }
+  async getFolder(id) { return idbGet(this.db, 'folders', id); }
+  async createFolder({ title, format }) {
+    const folder = {
+      id: crypto.randomUUID(), title: title.trim(), format,
+      createdDate: Date.now(), updatedDate: Date.now(),
+      coverMediaId: null, mediaOrder: [], deletedAt: null
+    };
+    await idbPut(this.db, 'folders', folder);
+    return folder;
+  }
+  async updateFolder(id, patch) {
+    const folder = await idbGet(this.db, 'folders', id);
+    if (!folder) return null;
+    const updated = { ...folder, ...patch, updatedDate: Date.now() };
+    await idbPut(this.db, 'folders', updated);
+    return updated;
+  }
+  // Soft-delete: folder (and its media) move to Recently Deleted instead of
+  // being destroyed immediately. Nothing is actually removed until restore
+  // is skipped and the item ages out (or Delete Permanently is used).
+  async trashFolder(id) {
+    const media = await idbGetAllByIndex(this.db, 'media', 'folderId', id);
+    const now = Date.now();
+    for (const m of media) {
+      if (!m.deletedAt) await idbPut(this.db, 'media', { ...m, deletedAt: now });
+    }
+    return this.updateFolder(id, { deletedAt: now });
+  }
+  async restoreFolder(id) {
+    const media = await idbGetAllByIndex(this.db, 'media', 'folderId', id);
+    for (const m of media) {
+      if (m.deletedAt) await idbPut(this.db, 'media', { ...m, deletedAt: null });
+    }
+    return this.updateFolder(id, { deletedAt: null });
+  }
+  // Irreversible: wipes the folder, its media records, and their blobs.
+  async permanentlyDeleteFolder(id) {
+    const all = await idbGetAllByIndex(this.db, 'media', 'folderId', id);
+    for (const m of all) await this._wipeMedia(m.id);
+    await idbDelete(this.db, 'folders', id);
+  }
+  async getTrashedFolders() {
+    const all = await idbGetAll(this.db, 'folders');
+    return all.filter((f) => !!f.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt);
+  }
+
+  // Active (non-trashed) media for a folder, in saved order.
+  async getFolderMedia(folderId) {
+    const all = await idbGetAllByIndex(this.db, 'media', 'folderId', folderId);
+    const active = all.filter((m) => !m.deletedAt);
+    const folder = await idbGet(this.db, 'folders', folderId);
+    const order = (folder && folder.mediaOrder) || [];
+    return active.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  }
+  async addMedia(folderId, file) {
+    const id = crypto.randomUUID();
+    const type = file.type.startsWith('video') ? 'video' : 'photo';
+    let thumbBlob = null;
+    try { thumbBlob = await makeThumbnail(file, type); } catch (e) { thumbBlob = null; }
+    // Full-quality original bytes are stored untouched — only the thumbnail
+    // is a resized copy, used purely for fast grid previews.
+    await this.blobStore.put(id, file);
+    if (thumbBlob) await this.blobStore.put(id + '-thumb', thumbBlob);
+    const mediaItem = {
+      id, folderId, type,
+      filename: file.name || `${type}-${id}`,
+      mimeType: file.type || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
+      createdDate: Date.now(), size: file.size || 0, deletedAt: null
+    };
+    await idbPut(this.db, 'media', mediaItem);
+    const folder = await idbGet(this.db, 'folders', folderId);
+    const mediaOrder = [...((folder && folder.mediaOrder) || []), id];
+    const patch = { mediaOrder };
+    if (folder && !folder.coverMediaId) patch.coverMediaId = id;
+    await this.updateFolder(folderId, patch);
+    return mediaItem;
+  }
+  // Soft-delete: keeps the record + blobs, just hides it from the grid and
+  // pulls it out of mediaOrder/cover so the folder looks right immediately.
+  async trashMedia(id) {
+    const media = await idbGet(this.db, 'media', id);
+    if (!media) return;
+    await idbPut(this.db, 'media', { ...media, deletedAt: Date.now() });
+    const folder = await idbGet(this.db, 'folders', media.folderId);
+    if (folder) {
+      const mediaOrder = (folder.mediaOrder || []).filter((x) => x !== id);
+      const patch = { mediaOrder };
+      if (folder.coverMediaId === id) patch.coverMediaId = mediaOrder[0] || null;
+      await this.updateFolder(media.folderId, patch);
+    }
+  }
+  async restoreMedia(id) {
+    const media = await idbGet(this.db, 'media', id);
+    if (!media) return;
+    await idbPut(this.db, 'media', { ...media, deletedAt: null });
+    const folder = await idbGet(this.db, 'folders', media.folderId);
+    if (folder && !(folder.mediaOrder || []).includes(id)) {
+      const mediaOrder = [...(folder.mediaOrder || []), id];
+      const patch = { mediaOrder };
+      if (!folder.coverMediaId) patch.coverMediaId = id;
+      await this.updateFolder(media.folderId, patch);
+    }
+  }
+  async permanentlyDeleteMedia(id) { await this._wipeMedia(id); }
+  async _wipeMedia(id) {
+    await this.blobStore.delete(id);
+    await this.blobStore.delete(id + '-thumb');
+    await idbDelete(this.db, 'media', id);
+    this.revokeUrl(id); this.revokeUrl(id + '-thumb');
+  }
+  async getTrashedMedia() {
+    const all = await idbGetAll(this.db, 'media');
+    return all.filter((m) => !!m.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt);
+  }
+  // Anything sitting in Recently Deleted for more than 30 days is wiped for
+  // good. Runs once at app startup.
+  async purgeOldTrash() {
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - THIRTY_DAYS;
+    const folders = await idbGetAll(this.db, 'folders');
+    for (const f of folders) {
+      if (f.deletedAt && f.deletedAt < cutoff) await this.permanentlyDeleteFolder(f.id);
+    }
+    const media = await idbGetAll(this.db, 'media');
+    for (const m of media) {
+      if (m.deletedAt && m.deletedAt < cutoff) await this._wipeMedia(m.id);
+    }
+  }
+
+  async reorderMedia(folderId, orderedIds) {
+    return this.updateFolder(folderId, { mediaOrder: orderedIds });
+  }
+  async setCover(folderId, mediaId) {
+    return this.updateFolder(folderId, { coverMediaId: mediaId });
+  }
+  async getObjectURL(blobId) {
+    if (!blobId) return null;
+    if (this.urlCache.has(blobId)) return this.urlCache.get(blobId);
+    const blob = await this.blobStore.get(blobId);
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    this.urlCache.set(blobId, url);
+    return url;
+  }
+  // Returns a real File (name + correct mime type) for sharing/downloading
+  // full-quality original media — used by the Share/Export actions.
+  async getMediaFile(mediaItem) {
+    const blob = await this.blobStore.get(mediaItem.id);
+    if (!blob) return null;
+    return new File([blob], mediaItem.filename, { type: mediaItem.mimeType || blob.type });
+  }
+  revokeUrl(id) {
+    if (this.urlCache.has(id)) { URL.revokeObjectURL(this.urlCache.get(id)); this.urlCache.delete(id); }
+  }
+  async getStorageEstimate() {
+    if (navigator.storage && navigator.storage.estimate) return navigator.storage.estimate();
+    return { usage: 0, quota: 0 };
+  }
+  get blobMode() { return this.blobStore.mode; }
+
+  // -- Session (simplest possible "login"): a single named profile per
+  // device, stored in IndexedDB so it survives closing and reopening the
+  // app. No password, no server — just a name, so the app has a personal
+  // "you're in" state instead of dropping straight into shared data.
+  async getSession() { return idbGet(this.db, 'session', 'current'); }
+  async signIn(name) {
+    const record = { id: 'current', name: name.trim(), loggedInAt: Date.now() };
+    await idbPut(this.db, 'session', record);
+    return record;
+  }
+  async signOut() { await idbDelete(this.db, 'session', 'current'); }
+}
+
+// ---------------------------------------------------------------------
+// APP STATE + RENDER LOOP (framework-free, event-delegated)
+// ---------------------------------------------------------------------
+let storage = null;
+let pendingConfirm = null;   // { message, confirmLabel, danger, onConfirm } — avoids native confirm()
+let pendingUndo = null;      // { onUndo } — wired to the current toast's Undo button
+const state = {
+  ready: false,
+  session: null,          // { name, loggedInAt } once signed in
+  tab: 'home',            // home | search | settings
+  folders: [],
+  searchQuery: '',
+  sortBy: 'newest',        // newest | oldest | alpha | format
+  showCreateSheet: false,
+  sheetMode: 'create',     // 'create' | 'edit'
+  editingFolderId: null,
+  openFolderId: null,
+  openFolderData: null,
+  openFolderMedia: [],
+  reorderMode: false,
+  selectMode: false,
+  selectedIds: new Set(),
+  fullscreen: null,        // { id, url, type, filename, mediaItem }
+  storageEstimate: { usage: 0, quota: 0 },
+  showTrash: false,
+  trashedFolders: [],
+  trashedMedia: [],
+  confirmVisible: false,
+};
+
+const appEl = document.getElementById('app');
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+// `undo`, if provided, is a function to call when the person taps Undo.
+// It gets ~5 seconds before the toast (and the option) disappears.
+function toast(msg, undo) {
+  pendingUndo = undo || null;
+  toastEl.innerHTML = undo
+    ? `<span>${escapeHtml(msg)}</span> <button data-action="toast-undo" style="margin-left:10px; background:none; border:none; color:#ffd479; font-weight:800; font-size:13.5px;">Undo</button>`
+    : escapeHtml(msg);
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.classList.remove('show'); pendingUndo = null; }, 5000);
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function bytesToSize(bytes) {
+  if (!bytes) return '0 KB';
+  const units = ['B','KB','MB','GB'];
+  let i = 0; let n = bytes;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+const FORMAT_ICONS = {
+  Reel: '▶', Carousel: '▦', Post: '□', Story: '◎'
+};
+
+async function refreshFolders() {
+  state.folders = await storage.getFolders();
+  state.trashedFolders = await storage.getTrashedFolders();
+  state.trashedMedia = await storage.getTrashedMedia();
+  render();
+}
+
+function sortedFilteredFolders() {
+  let list = [...state.folders];
+  const q = state.searchQuery.trim().toLowerCase();
+  if (q) {
+    list = list.filter(f =>
+      f.title.toLowerCase().includes(q) ||
+      f.format.toLowerCase().includes(q) ||
+      fmtDate(f.createdDate).toLowerCase().includes(q)
+    );
+  }
+  switch (state.sortBy) {
+    case 'oldest': list.sort((a,b) => a.createdDate - b.createdDate); break;
+    case 'alpha': list.sort((a,b) => a.title.localeCompare(b.title)); break;
+    case 'format': list.sort((a,b) => a.format.localeCompare(b.format)); break;
+    default: list.sort((a,b) => b.createdDate - a.createdDate);
+  }
+  return list;
+}
+
+// ---- Cover thumbnail resolution (async, injected after render) -------
+function hydrateCovers(root) {
+  root.querySelectorAll('[data-cover-for]').forEach(async (el) => {
+    const folderId = el.getAttribute('data-cover-for');
+    const folder = state.folders.find(f => f.id === folderId);
+    if (!folder || !folder.coverMediaId) return;
+    const url = await storage.getObjectURL(folder.coverMediaId + '-thumb') || await storage.getObjectURL(folder.coverMediaId);
+    if (url) el.innerHTML = `<img src="${url}" alt="">`;
+  });
+}
+function hydrateMediaThumbs(root) {
+  root.querySelectorAll('[data-media-thumb]').forEach(async (el) => {
+    const id = el.getAttribute('data-media-thumb');
+    const url = await storage.getObjectURL(id + '-thumb') || await storage.getObjectURL(id);
+    if (url) {
+      const type = el.getAttribute('data-media-type');
+      el.innerHTML = type === 'video' ? `<img src="${url}" alt="">` : `<img src="${url}" alt="">`;
+    }
+  });
+}
+function hydrateTrashThumbs(root) {
+  root.querySelectorAll('[data-trash-cover-for]').forEach(async (el) => {
+    const folderId = el.getAttribute('data-trash-cover-for');
+    const folder = state.trashedFolders.find(f => f.id === folderId);
+    if (!folder || !folder.coverMediaId) return;
+    const url = await storage.getObjectURL(folder.coverMediaId + '-thumb') || await storage.getObjectURL(folder.coverMediaId);
+    if (url) el.innerHTML = `<img src="${url}" alt="">`;
+  });
+}
+
+function render() {
+  if (!state.ready) {
+    appEl.innerHTML = `<div class="screen" style="display:flex;align-items:center;justify-content:center;height:100vh;color:#6b6b70;font-size:14px;">Loading Socialset…</div>`;
+    return;
+  }
+  if (!state.session) {
+    appEl.innerHTML = renderLogin();
+    const nameInput = document.getElementById('login-name-input');
+    if (nameInput) nameInput.focus({ preventScroll: true });
+    return;
+  }
+  let html = '';
+  if (state.openFolderId) html = renderFolderView();
+  else if (state.showTrash) html = renderTrash();
+  else if (state.tab === 'home') html = renderHome();
+  else if (state.tab === 'search') html = renderSearch();
+  else if (state.tab === 'settings') html = renderSettings();
+
+  html += renderBottomNavAndFab();
+  if (state.showCreateSheet) html += renderCreateSheet();
+  if (state.fullscreen) html += renderFullscreen();
+  if (state.confirmVisible && pendingConfirm) html += renderConfirmDialog();
+
+  appEl.innerHTML = html;
+  hydrateCovers(appEl);
+  hydrateMediaThumbs(appEl);
+  hydrateTrashThumbs(appEl);
+  const createInput = document.getElementById('create-title-input');
+  if (createInput) createInput.focus({ preventScroll: true });
+
+  if (state.openFolderId && state.reorderMode) {
+    const grid = appEl.querySelector('.media-grid');
+    if (grid) setupReorderDrag(grid);
+  }
+}
+
+// Small helper used by delete flows: shows a confirm sheet instead of the
+// browser's native confirm() dialog, which some in-app / embedded browser
+// contexts silently block or auto-dismiss — this keeps confirmation
+// reliable everywhere the app runs, including as an installed PWA.
+function askConfirm(message, onConfirm, confirmLabel = 'Delete', danger = true) {
+  pendingConfirm = { message, confirmLabel, danger, onConfirm };
+  state.confirmVisible = true;
+  render();
+}
+
+// ---------------------------------------------------------------------
+// DRAG-TO-REORDER (Pointer Events — works for touch, mouse, and pen)
+// Dragging re-orders DOM nodes live for instant visual feedback; the
+// new order is only persisted to storage once the finger/mouse lifts.
+// ---------------------------------------------------------------------
+function setupReorderDrag(gridEl) {
+  let dragEl = null;
+
+  gridEl.querySelectorAll('.media-cell[data-drag-id]').forEach((cell) => {
+    cell.addEventListener('pointerdown', (e) => {
+      dragEl = cell;
+      try { cell.setPointerCapture(e.pointerId); } catch (err) {}
+      cell.classList.add('dragging');
+    });
+
+    cell.addEventListener('pointermove', (e) => {
+      if (dragEl !== cell) return;
+      e.preventDefault();
+      const overEl = document.elementFromPoint(e.clientX, e.clientY);
+      const targetCell = overEl && overEl.closest && overEl.closest('.media-cell[data-drag-id]');
+      if (targetCell && targetCell !== dragEl && targetCell.parentElement === gridEl) {
+        const cells = Array.from(gridEl.children);
+        const dragIdx = cells.indexOf(dragEl);
+        const targetIdx = cells.indexOf(targetCell);
+        if (dragIdx < targetIdx) gridEl.insertBefore(dragEl, targetCell.nextSibling);
+        else gridEl.insertBefore(dragEl, targetCell);
+      }
+    });
+
+    const finishDrag = async (e) => {
+      if (dragEl !== cell) return;
+      cell.classList.remove('dragging');
+      dragEl = null;
+      const newOrder = Array.from(gridEl.children).map((c) => c.getAttribute('data-drag-id'));
+      await storage.reorderMedia(state.openFolderId, newOrder);
+      state.openFolderMedia = await storage.getFolderMedia(state.openFolderId);
+      // No full render() here on purpose — the grid is already visually
+      // correct from the live drag; a render would just re-hydrate thumbs.
+    };
+    cell.addEventListener('pointerup', finishDrag);
+    cell.addEventListener('pointercancel', finishDrag);
+  });
+}
+
+function renderFolderCard(f) {
+  const count = (f.mediaOrder || []).length;
+  return `
+    <div class="folder-card" data-action="open-folder" data-id="${f.id}">
+      <div class="fc-cover" data-cover-for="${f.id}"></div>
+      <div class="fc-body">
+        <span class="fc-format">${FORMAT_ICONS[f.format] || ''} ${f.format}</span>
+        <div class="fc-title">${escapeHtml(f.title)}</div>
+        <div class="fc-meta">${count} file${count === 1 ? '' : 's'} · ${fmtDate(f.createdDate)}</div>
+      </div>
+    </div>`;
+}
+
+function renderLogin() {
+  return `
+    <div class="screen" style="display:flex; flex-direction:column; justify-content:center; min-height:100vh; padding-bottom:40px;">
+      <div style="text-align:center; margin-bottom:36px;">
+        <div style="width:64px; height:64px; border-radius:20px; background:var(--accent-grad); margin:0 auto 18px; display:flex; align-items:center; justify-content:center;">
+          ${folderIcon(30)}
+        </div>
+        <h1 class="app-title">Socialset</h1>
+        <p class="subtitle">Keep your Instagram content separate from your camera roll.</p>
+      </div>
+      <div class="field">
+        <label>Your name</label>
+        <input id="login-name-input" type="text" placeholder="e.g. Daniela" autocomplete="name" />
+      </div>
+      <button class="btn" data-action="submit-login">Continue</button>
+      <p class="upload-hint" style="margin-top:16px;">No password needed. This just keeps your content tied to you on this device — everything you add stays saved here even after you log out and back in.</p>
+    </div>`;
+}
+
+function renderHome() {
+  const list = sortedFilteredFolders();
+  return `
+    <div class="screen">
+      <h1 class="app-title">Socialset</h1>
+      <p class="subtitle">Your Instagram content, kept apart from your camera roll.</p>
+      <div class="searchbar">
+        ${searchIcon()}
+        <input id="home-search" type="text" placeholder="Search folders" value="${escapeAttr(state.searchQuery)}" data-action="search-input" />
+      </div>
+      <div class="sortrow">
+        ${sortChip('newest','Newest')}${sortChip('oldest','Oldest')}${sortChip('alpha','A–Z')}${sortChip('format','Format')}
+      </div>
+      ${list.length ? `<div class="folder-list">${list.map(renderFolderCard).join('')}</div>` : renderEmptyHome()}
+    </div>`;
+}
+
+function renderEmptyHome() {
+  return `
+    <div class="empty-state">
+      ${folderIcon(46)}
+      <b>No content yet</b>
+      <div>Tap + to create your first Reel, Post, Carousel or Story folder.</div>
+    </div>`;
+}
+
+function sortChip(val, label) {
+  return `<button class="chip ${state.sortBy === val ? 'active' : ''}" data-action="set-sort" data-value="${val}">${label}</button>`;
+}
+
+function renderSearch() {
+  const list = sortedFilteredFolders();
+  return `
+    <div class="screen">
+      <h1 class="app-title">Search</h1>
+      <div class="searchbar" style="margin-top:16px;">
+        ${searchIcon()}
+        <input id="search-search" type="text" placeholder="Search by title, format or date" value="${escapeAttr(state.searchQuery)}" data-action="search-input" autofocus />
+      </div>
+      ${state.searchQuery.trim()
+        ? (list.length ? `<div class="folder-list">${list.map(renderFolderCard).join('')}</div>` : `<div class="empty-state">${searchIcon(40)}<b>No matches</b><div>Try a different title, format or date.</div></div>`)
+        : `<div class="empty-state">${searchIcon(40)}<b>Search your content</b><div>Find folders by title, format, or date created.</div></div>`
+      }
+    </div>`;
+}
+
+function renderSettings() {
+  const used = bytesToSize(state.storageEstimate.usage);
+  const mode = storage.blobMode === 'opfs' ? 'Private app storage (OPFS)' : 'IndexedDB (fallback)';
+  return `
+    <div class="screen">
+      <h1 class="app-title">Settings</h1>
+      <div class="settings-group">
+        <div class="settings-group-title">Account</div>
+        <div class="settings-row"><span class="label">Signed in as</span><span class="value">${escapeHtml(state.session ? state.session.name : '')}</span></div>
+        <div class="settings-row"><span class="label">Log out</span><button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px;" data-action="sign-out">Log out</button></div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-title">About</div>
+        <div class="settings-row"><span class="label">App version</span><span class="value">1.0.0</span></div>
+        <div class="settings-row"><span class="label">Storage used</span><span class="value">${used}</span></div>
+        <div class="settings-row"><span class="label">Storage mode</span><span class="value">${mode}</span></div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-title">Data</div>
+        <div class="settings-row" data-action="open-trash" style="cursor:pointer;">
+          <span class="label">Recently Deleted</span>
+          <span class="value">${state.trashedFolders.length + state.trashedMedia.length} item${(state.trashedFolders.length + state.trashedMedia.length) === 1 ? '' : 's'} ›</span>
+        </div>
+        <div class="settings-row"><span class="label">Export database</span><button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px;" data-action="noop">Export</button></div>
+        <div class="settings-row"><span class="label">Import database</span><button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px;" data-action="noop">Import</button></div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-title">Cloud</div>
+        <div class="settings-row"><span class="label">Cloud sync</span><span class="soon-pill">Coming soon</span></div>
+      </div>
+    </div>`;
+}
+
+function renderFolderView() {
+  const f = state.openFolderData;
+  if (!f) return '';
+  const media = state.openFolderMedia;
+  const n = state.selectedIds.size;
+  const allSelected = media.length > 0 && n === media.length;
+  return `
+    <div class="screen">
+      <div class="fv-header">
+        <button class="iconbtn" data-action="close-folder">${chevronLeft()}</button>
+        <div class="fv-titles">
+          <div class="t">${escapeHtml(f.title)}</div>
+          <div class="s">${f.format} · ${media.length} file${media.length === 1 ? '' : 's'} · ${fmtDate(f.createdDate)}</div>
+        </div>
+        <button class="iconbtn" data-action="open-edit-folder" data-id="${f.id}">${pencilIcon()}</button>
+        <button class="iconbtn" data-action="delete-folder" data-id="${f.id}">${trashIcon()}</button>
+      </div>
+      <div class="fv-actions">
+        <label class="btn" style="flex:1; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+          ${uploadIcon()} Upload
+          <input type="file" accept="image/*,video/*" multiple style="display:none;" data-action="upload-input" />
+        </label>
+        <label class="btn secondary" style="flex:1; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+          ${cameraIcon()} Capture
+          <input type="file" accept="image/*,video/*" capture="environment" style="display:none;" data-action="upload-input" />
+        </label>
+        <button class="btn ${state.reorderMode ? '' : 'secondary'}" style="flex:0 0 auto; padding:14px 16px;" data-action="toggle-reorder">${state.reorderMode ? 'Done' : 'Reorder'}</button>
+      </div>
+      ${media.length ? `
+        <button class="btn secondary" style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px;" data-action="toggle-select-mode">
+          ${state.selectMode ? 'Cancel selecting' : 'Select to share / delete'}
+        </button>` : ''}
+      ${state.selectMode ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+          <button class="chip" data-action="toggle-select-all">${allSelected ? 'Deselect all' : 'Select all'}</button>
+          <span class="subtitle">${n} selected</span>
+        </div>` : ''}
+      ${state.reorderMode ? `<div class="upload-hint" style="margin-top:14px;">Press and drag any item to reorder.</div>` : ''}
+      ${media.length ? `<div class="media-grid ${state.reorderMode ? 'reorder-active' : ''}">${media.map((m, i) => renderMediaCell(m, i, media.length)).join('')}</div>` : `<div class="empty-media"><b>No media yet.</b><div class="upload-hint">Upload photos or videos to fill this folder.</div></div>`}
+      ${state.selectMode && n > 0 ? `<div style="height:76px;"></div>` : ''}
+      ${state.selectMode && n > 0 ? `
+        <div style="position:fixed; left:0; right:0; bottom:0; max-width:430px; margin:0 auto; padding:14px 18px calc(14px + var(--safe-bottom)); background:#fff; border-top:1px solid var(--line); display:flex; gap:8px; z-index:25;">
+          <button class="btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;" data-action="share-selected">${shareIcon()} Share ${n}</button>
+          <button class="btn secondary" style="flex:1; color:#e0324c;" data-action="delete-selected">Delete ${n}</button>
+        </div>` : ''}
+    </div>`;
+}
+
+function renderMediaCell(m, i, total) {
+  const isCover = state.openFolderData.coverMediaId === m.id;
+  if (state.reorderMode) {
+    return `
+      <div class="media-cell draggable" data-drag-id="${m.id}">
+        <div data-media-thumb="${m.id}" data-media-type="${m.type}"></div>
+        ${m.type === 'video' ? `<div class="badge">▶</div>` : ''}
+        ${isCover ? `<div class="cover-tag">Cover</div>` : ''}
+        <div class="grip">${gripIcon()}</div>
+      </div>`;
+  }
+  if (state.selectMode) {
+    const checked = state.selectedIds.has(m.id);
+    return `
+      <div class="media-cell ${checked ? 'selected' : ''}" data-action="toggle-select" data-id="${m.id}">
+        <div data-media-thumb="${m.id}" data-media-type="${m.type}"></div>
+        ${m.type === 'video' ? `<div class="badge">▶</div>` : ''}
+        <div class="select-check ${checked ? 'checked' : ''}">${checked ? checkIcon() : ''}</div>
+      </div>`;
+  }
+  return `
+    <div class="media-cell" data-action="view-media" data-id="${m.id}" data-type="${m.type}">
+      <div data-media-thumb="${m.id}" data-media-type="${m.type}"></div>
+      ${m.type === 'video' ? `<div class="badge">▶</div>` : ''}
+      ${isCover ? `<div class="cover-tag">Cover</div>` : ''}
+      <button class="delete-x" data-action="delete-media" data-id="${m.id}" onclick="event.stopPropagation()">${xIcon()}</button>
+    </div>`;
+}
+
+function renderBottomNavAndFab() {
+  if (state.openFolderId) return ''; // folder view has no bottom nav/fab (full focus mode)
+  return `
+    ${state.showTrash ? '' : `<button class="fab" data-action="open-create">${plusIcon()}</button>`}
+    <div class="bottomnav">
+      ${navBtn('home', homeIcon(), 'Home')}
+      ${navBtn('search', searchIcon(), 'Search')}
+      ${navBtn('settings', gearIcon(), 'Settings')}
+    </div>`;
+}
+function navBtn(tab, icon, label) {
+  return `<button class="navbtn ${state.tab === tab ? 'active' : ''}" data-action="set-tab" data-value="${tab}">${icon}<span>${label}</span><span class="dot"></span></button>`;
+}
+
+function renderCreateSheet() {
+  const editing = state.sheetMode === 'edit';
+  const f = editing ? state.folders.find(x => x.id === state.editingFolderId) : null;
+  return `
+    <div class="sheet-backdrop">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <h3>${editing ? 'Edit Content' : 'Create New Content'}</h3>
+        <div class="field">
+          <label>Content Format</label>
+          <select id="create-format-input">
+            <option value="Reel" ${f && f.format === 'Reel' ? 'selected' : ''}>Reel</option>
+            <option value="Carousel" ${f && f.format === 'Carousel' ? 'selected' : ''}>Carousel</option>
+            <option value="Post" ${f && f.format === 'Post' ? 'selected' : ''}>Post</option>
+            <option value="Story" ${f && f.format === 'Story' ? 'selected' : ''}>Story</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Content Title</label>
+          <input id="create-title-input" type="text" placeholder="What Grew In The Mess" value="${f ? escapeAttr(f.title) : ''}" />
+        </div>
+        <button class="btn" data-action="${editing ? 'submit-edit' : 'submit-create'}">${editing ? 'Save' : 'Create'}</button>
+        <button class="btn ghost" data-action="close-sheet">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function renderConfirmDialog() {
+  const c = pendingConfirm;
+  return `
+    <div class="sheet-backdrop">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <h3>${escapeHtml(c.message)}</h3>
+        <button class="btn" style="${c.danger ? 'background:#e0324c;' : ''}" data-action="confirm-yes">${escapeHtml(c.confirmLabel)}</button>
+        <button class="btn ghost" data-action="confirm-no">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function renderTrash() {
+  const folders = state.trashedFolders;
+  const media = state.trashedMedia;
+  const empty = !folders.length && !media.length;
+  return `
+    <div class="screen">
+      <div class="fv-header">
+        <button class="iconbtn" data-action="close-trash">${chevronLeft()}</button>
+        <div class="fv-titles"><div class="t">Recently Deleted</div><div class="s">Kept for 30 days, then removed for good</div></div>
+      </div>
+      ${empty ? `<div class="empty-state">${trashIcon(40)}<b>Nothing deleted</b><div>Deleted folders and media show up here for 30 days.</div></div>` : ''}
+      ${folders.length ? `
+        <div class="settings-group-title" style="margin-top:20px;">Folders</div>
+        <div class="folder-list">${folders.map(f => `
+          <div class="folder-card">
+            <div class="fc-cover" data-trash-cover-for="${f.id}"></div>
+            <div class="fc-body">
+              <span class="fc-format">${FORMAT_ICONS[f.format] || ''} ${f.format}</span>
+              <div class="fc-title">${escapeHtml(f.title)}</div>
+              <div class="fc-meta">Deleted ${fmtDate(f.deletedAt)}</div>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn secondary" style="padding:8px 12px; font-size:12.5px;" data-action="restore-folder" data-id="${f.id}">Restore</button>
+                <button class="btn secondary" style="padding:8px 12px; font-size:12.5px; color:#e0324c;" data-action="permadelete-folder" data-id="${f.id}">Delete forever</button>
+              </div>
+            </div>
+          </div>`).join('')}</div>` : ''}
+      ${media.length ? `
+        <div class="settings-group-title" style="margin-top:20px;">Media</div>
+        <div class="media-grid" style="margin-top:10px;">${media.map(m => `
+          <div class="media-cell">
+            <div data-media-thumb="${m.id}" data-media-type="${m.type}"></div>
+            ${m.type === 'video' ? `<div class="badge">▶</div>` : ''}
+            <div class="trash-actions">
+              <button data-action="restore-media" data-id="${m.id}" title="Restore">${uploadIcon()}</button>
+              <button data-action="permadelete-media" data-id="${m.id}" title="Delete forever">${xIcon()}</button>
+            </div>
+          </div>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+function renderFullscreen() {
+  return `
+    <div class="fullscreen" id="fullscreen-root" data-action="noop">
+      <div class="top"><button class="close" data-action="close-fullscreen">${xIcon()}</button></div>
+      <div class="stage" id="fullscreen-stage"></div>
+      <div class="bottom">
+        <button class="btn" data-action="share-media">${shareIcon()} Share</button>
+        <button class="btn" data-action="set-as-cover-fs">Set as cover</button>
+        <button class="btn" data-action="delete-fs">Delete</button>
+      </div>
+    </div>`;
+}
+
+// ---- tiny inline icon set (stroke-based, minimal) ---------------------
+function icon(paths, size=20) { return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`; }
+function searchIcon(size=18){ return icon('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>', size); }
+function homeIcon(){ return icon('<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>', 20); }
+function gearIcon(){ return icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.1.7.6 1.3 1.5 1.5H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', 20); }
+function plusIcon(){ return icon('<path d="M12 5v14M5 12h14"/>', 26); }
+function chevronLeft(){ return icon('<path d="m15 18-6-6 6-6"/>', 20); }
+function trashIcon(size=18){ return icon('<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>', size); }
+function uploadIcon(){ return icon('<path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M5 20h14"/>', 17); }
+function cameraIcon(){ return icon('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/>', 17); }
+function xIcon(){ return icon('<path d="M18 6 6 18M6 6l12 12"/>', 14); }
+function gripIcon(){ return icon('<circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none"/>', 14); }
+function pencilIcon(){ return icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>', 17); }
+function shareIcon(){ return icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-3.9M8.6 13.5l6.8 3.9"/>', 17); }
+function checkIcon(){ return icon('<path d="M20 6 9 17l-5-5"/>', 14); }
+function folderIcon(size=40){ return icon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>', size); }
+
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return escapeHtml(s); }
+
+// ---------------------------------------------------------------------
+// EVENT HANDLING (single delegated listener)
+// ---------------------------------------------------------------------
+let fsObjectUrl = null;
+
+appEl.addEventListener('click', async (e) => {
+  // Closing a sheet by tapping the dimmed backdrop: only when the click
+  // lands directly on the backdrop itself (not bubbled from the sheet's
+  // contents), so taps inside the sheet never get accidentally swallowed.
+  if (e.target.classList && e.target.classList.contains('sheet-backdrop')) {
+    if (state.confirmVisible) { state.confirmVisible = false; pendingConfirm = null; }
+    else { state.showCreateSheet = false; }
+    render();
+    return;
+  }
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.getAttribute('data-action');
+
+  if (action === 'submit-login') {
+    const input = document.getElementById('login-name-input');
+    const name = input ? input.value.trim() : '';
+    if (!name) { toast('Enter your name to continue'); return; }
+    state.session = await storage.signIn(name);
+    await refreshFolders();
+    render();
+    return;
+  } else if (action === 'sign-out') {
+    askConfirm(
+      'Log out? Your folders and media stay saved on this device — logging back in with the same name brings them right back.',
+      async () => {
+        await storage.signOut();
+        state.session = null;
+        render();
+      },
+      'Log out',
+      false
+    );
+    return;
+  } else if (action === 'set-tab') {
+    state.tab = el.getAttribute('data-value');
+    state.searchQuery = state.tab === 'search' ? state.searchQuery : state.searchQuery;
+    render();
+  } else if (action === 'set-sort') {
+    state.sortBy = el.getAttribute('data-value');
+    render();
+  } else if (action === 'open-create') {
+    state.sheetMode = 'create';
+    state.editingFolderId = null;
+    state.showCreateSheet = true;
+    render();
+  } else if (action === 'open-edit-folder') {
+    state.sheetMode = 'edit';
+    state.editingFolderId = el.getAttribute('data-id');
+    // Make sure the folder being edited is present in state.folders even
+    // if we navigated here straight from search results.
+    if (!state.folders.some(f => f.id === state.editingFolderId) && state.openFolderData) {
+      state.folders = [...state.folders, state.openFolderData];
+    }
+    state.showCreateSheet = true;
+    render();
+  } else if (action === 'close-sheet') {
+    state.showCreateSheet = false;
+    render();
+  } else if (action === 'submit-create') {
+    const title = document.getElementById('create-title-input').value.trim();
+    const format = document.getElementById('create-format-input').value;
+    if (!title) { toast('Give it a title first'); return; }
+    await storage.createFolder({ title, format });
+    state.showCreateSheet = false;
+    await refreshFolders();
+    toast('Folder created');
+  } else if (action === 'submit-edit') {
+    const title = document.getElementById('create-title-input').value.trim();
+    const format = document.getElementById('create-format-input').value;
+    if (!title) { toast('Give it a title first'); return; }
+    await storage.updateFolder(state.editingFolderId, { title, format });
+    state.showCreateSheet = false;
+    await refreshFolders();
+    if (state.openFolderId === state.editingFolderId) await reloadOpenFolderData();
+    toast('Saved');
+  } else if (action === 'open-folder') {
+    const id = el.getAttribute('data-id');
+    await openFolder(id);
+  } else if (action === 'close-folder') {
+    state.openFolderId = null; state.openFolderData = null; state.openFolderMedia = [];
+    state.reorderMode = false; state.selectMode = false; state.selectedIds = new Set();
+    await refreshFolders();
+  } else if (action === 'delete-folder') {
+    const id = el.getAttribute('data-id');
+    askConfirm(
+      'Delete this folder and its media? It\'ll move to Recently Deleted for 30 days, so you can still get it back.',
+      async () => {
+        await storage.trashFolder(id);
+        state.openFolderId = null; state.openFolderData = null; state.openFolderMedia = [];
+        await refreshFolders();
+        toast('Folder deleted', async () => {
+          await storage.restoreFolder(id);
+          await refreshFolders();
+          toast('Restored');
+        });
+      },
+      'Delete',
+      true
+    );
+  } else if (action === 'toggle-reorder') {
+    state.reorderMode = !state.reorderMode;
+    if (state.reorderMode) { state.selectMode = false; state.selectedIds = new Set(); }
+    render();
+  } else if (action === 'toggle-select-mode') {
+    state.selectMode = !state.selectMode;
+    state.selectedIds = new Set();
+    if (state.selectMode) state.reorderMode = false;
+    render();
+  } else if (action === 'toggle-select') {
+    const id = el.getAttribute('data-id');
+    if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+    else state.selectedIds.add(id);
+    render();
+  } else if (action === 'toggle-select-all') {
+    if (state.selectedIds.size === state.openFolderMedia.length) {
+      state.selectedIds = new Set();
+    } else {
+      state.selectedIds = new Set(state.openFolderMedia.map(m => m.id));
+    }
+    render();
+  } else if (action === 'share-selected') {
+    const items = state.openFolderMedia.filter(m => state.selectedIds.has(m.id));
+    await shareMediaItems(items);
+  } else if (action === 'delete-selected') {
+    const ids = Array.from(state.selectedIds);
+    askConfirm(
+      `Delete ${ids.length} item${ids.length === 1 ? '' : 's'}? They'll move to Recently Deleted for 30 days.`,
+      async () => {
+        for (const id of ids) await storage.trashMedia(id);
+        state.selectMode = false; state.selectedIds = new Set();
+        await reloadOpenFolderMedia();
+        await refreshFoldersQuiet();
+        toast(`${ids.length} item${ids.length === 1 ? '' : 's'} deleted`, async () => {
+          for (const id of ids) await storage.restoreMedia(id);
+          await reloadOpenFolderMedia();
+          await refreshFoldersQuiet();
+          toast('Restored');
+        });
+      },
+      'Delete',
+      true
+    );
+  } else if (action === 'delete-media') {
+    const id = el.getAttribute('data-id');
+    await storage.trashMedia(id);
+    await reloadOpenFolderMedia();
+    await refreshFoldersQuiet();
+    toast('Removed', async () => {
+      await storage.restoreMedia(id);
+      await reloadOpenFolderMedia();
+      await refreshFoldersQuiet();
+      toast('Restored');
+    });
+  } else if (action === 'view-media') {
+    const id = el.getAttribute('data-id');
+    const type = el.getAttribute('data-type');
+    const mediaItem = state.openFolderMedia.find(m => m.id === id);
+    const url = await storage.getObjectURL(id);
+    state.fullscreen = { id, url, type, filename: mediaItem ? mediaItem.filename : '', mediaItem };
+    render();
+    const stage = document.getElementById('fullscreen-stage');
+    if (stage) {
+      stage.innerHTML = type === 'video'
+        ? `<video src="${url}" controls autoplay playsinline></video>`
+        : `<img src="${url}" alt="">`;
+    }
+  } else if (action === 'close-fullscreen') {
+    state.fullscreen = null;
+    render();
+  } else if (action === 'set-as-cover-fs') {
+    if (state.fullscreen) {
+      await storage.setCover(state.openFolderId, state.fullscreen.id);
+      await reloadOpenFolderData();
+      toast('Cover updated');
+    }
+  } else if (action === 'delete-fs') {
+    if (state.fullscreen) {
+      const id = state.fullscreen.id;
+      await storage.trashMedia(id);
+      state.fullscreen = null;
+      await reloadOpenFolderMedia();
+      await refreshFoldersQuiet();
+      toast('Removed', async () => {
+        await storage.restoreMedia(id);
+        await reloadOpenFolderMedia();
+        await refreshFoldersQuiet();
+        toast('Restored');
+      });
+    }
+  } else if (action === 'share-media') {
+    if (state.fullscreen && state.fullscreen.mediaItem) {
+      await shareMediaItems([state.fullscreen.mediaItem]);
+    }
+  } else if (action === 'open-trash') {
+    state.trashedFolders = await storage.getTrashedFolders();
+    state.trashedMedia = await storage.getTrashedMedia();
+    state.showTrash = true;
+    render();
+  } else if (action === 'close-trash') {
+    state.showTrash = false;
+    render();
+  } else if (action === 'restore-folder') {
+    const id = el.getAttribute('data-id');
+    await storage.restoreFolder(id);
+    state.trashedFolders = await storage.getTrashedFolders();
+    await refreshFoldersQuiet();
+    render();
+    toast('Folder restored');
+  } else if (action === 'permadelete-folder') {
+    const id = el.getAttribute('data-id');
+    askConfirm('Delete this folder forever? This can\'t be undone.', async () => {
+      await storage.permanentlyDeleteFolder(id);
+      state.trashedFolders = await storage.getTrashedFolders();
+      state.trashedMedia = await storage.getTrashedMedia();
+      render();
+      toast('Deleted permanently');
+    }, 'Delete forever', true);
+  } else if (action === 'restore-media') {
+    const id = el.getAttribute('data-id');
+    await storage.restoreMedia(id);
+    state.trashedMedia = await storage.getTrashedMedia();
+    await refreshFoldersQuiet();
+    render();
+    toast('Restored');
+  } else if (action === 'permadelete-media') {
+    const id = el.getAttribute('data-id');
+    askConfirm('Delete this item forever? This can\'t be undone.', async () => {
+      await storage.permanentlyDeleteMedia(id);
+      state.trashedMedia = await storage.getTrashedMedia();
+      render();
+      toast('Deleted permanently');
+    }, 'Delete forever', true);
+  } else if (action === 'confirm-yes') {
+    const c = pendingConfirm;
+    state.confirmVisible = false;
+    pendingConfirm = null;
+    render();
+    if (c && c.onConfirm) await c.onConfirm();
+  } else if (action === 'confirm-no') {
+    state.confirmVisible = false;
+    pendingConfirm = null;
+    render();
+  } else if (action === 'toast-undo') {
+    toastEl.classList.remove('show');
+    const fn = pendingUndo;
+    pendingUndo = null;
+    if (fn) await fn();
+  }
+});
+
+appEl.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-action="search-input"]');
+  if (!el) return;
+  state.searchQuery = el.value;
+  const list = sortedFilteredFolders();
+  // Light-touch re-render of just the list to keep focus in the input
+  const container = state.tab === 'search'
+    ? appEl.querySelector('.screen')
+    : appEl.querySelector('.screen');
+  render();
+  const input = document.getElementById(state.tab === 'search' ? 'search-search' : 'home-search');
+  if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+});
+
+appEl.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  if (e.target.id === 'login-name-input') {
+    e.preventDefault();
+    document.querySelector('[data-action="submit-login"]')?.click();
+  } else if (e.target.id === 'create-title-input') {
+    e.preventDefault();
+    document.querySelector('[data-action="submit-create"]')?.click();
+  }
+});
+
+appEl.addEventListener('change', async (e) => {
+  const el = e.target.closest('[data-action="upload-input"]');
+  if (!el || !el.files || !el.files.length) return;
+  const files = Array.from(el.files);
+  let ok = 0, failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    toast(`Importing ${i + 1} of ${files.length}…`);
+    try {
+      await Promise.race([
+        storage.addMedia(state.openFolderId, file),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('import timeout')), 20000))
+      ]);
+      ok++;
+    } catch (err) {
+      console.error('Import failed for', file.name, err);
+      failed++;
+    }
+    // Reflect each successful import in the grid immediately, rather than
+    // waiting for the whole batch to finish — makes multi-file imports feel
+    // responsive and makes it obvious the app is still working through them.
+    await reloadOpenFolderMedia();
+  }
+  el.value = '';
+  await reloadOpenFolderData();
+  await reloadOpenFolderMedia();
+  toast(failed ? `Imported ${ok}, ${failed} failed` : `Imported ${ok} file${ok === 1 ? '' : 's'}`);
+});
+
+async function openFolder(id) {
+  state.openFolderId = id;
+  await reloadOpenFolderData();
+  await reloadOpenFolderMedia();
+}
+async function reloadOpenFolderData() {
+  state.openFolderData = await storage.getFolder(state.openFolderId);
+  render();
+}
+async function reloadOpenFolderMedia() {
+  state.openFolderMedia = await storage.getFolderMedia(state.openFolderId);
+  render();
+}
+async function refreshFoldersQuiet() {
+  state.folders = await storage.getFolders();
+}
+
+// ---------------------------------------------------------------------
+// SHARE / EXPORT — the bridge into Instagram, CapCut, etc.
+//
+// Important platform reality: a website/PWA cannot register itself as a
+// source *inside* another app's own upload picker (e.g. Instagram's "select
+// from library" screen) — that kind of file-provider integration is an
+// OS-level capability only native apps can register for. What a PWA *can*
+// do is hand a full-quality file straight to the device's native share
+// sheet via the Web Share API. On iPhone/Android that share sheet
+// typically offers "Save to Photos/Files" and, if installed, direct
+// share-targets for apps like Instagram or CapCut. In practice: Share →
+// Save to Photos (a few seconds) → the file is now in the camera roll and
+// selectable from inside Instagram/CapCut/Edits like any other photo/video.
+// ---------------------------------------------------------------------
+async function shareMediaItems(mediaItems) {
+  if (!mediaItems || !mediaItems.length) { toast('Nothing to share'); return; }
+  toast('Preparing…');
+  const files = [];
+  for (const m of mediaItems) {
+    const file = await storage.getMediaFile(m);
+    if (file) files.push(file);
+  }
+  if (!files.length) { toast('Could not load media'); return; }
+
+  // 1) Try sharing everything in one go (works great on iOS Safari, and on
+  // Android when the files are small/similar enough).
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files, title: 'Socialset' });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // person cancelled the sheet
+      // fall through
+    }
+  }
+
+  // 2) Chrome on Android frequently refuses canShare() for a *batch* of
+  // files (mixed photo/video, combined size, etc.) even though each file
+  // shares fine on its own — and silently falling back to a plain download
+  // means "Share" never actually reaches Instagram/CapCut. So when more
+  // than one file was picked, share them one at a time instead: each opens
+  // its own share sheet, and only once you dismiss/complete it does the
+  // next one appear. Slower than one shared batch, but it actually reaches
+  // Instagram/CapCut instead of just downloading.
+  if (navigator.canShare && files.some(f => navigator.canShare({ files: [f] }))) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!navigator.canShare({ files: [file] })) continue;
+      if (files.length > 1) toast(`Share ${i + 1} of ${files.length} — choose where to send it`);
+      try {
+        await navigator.share({ files: [file], title: file.name });
+      } catch (err) {
+        if (err && err.name === 'AbortError') continue; // skip to the next file
+      }
+    }
+    return;
+  }
+
+  // 3) Last resort (desktop browsers, or Web Share unsupported entirely):
+  // trigger a normal download for each file.
+  for (const file of files) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  toast(`Downloaded ${files.length} file${files.length === 1 ? '' : 's'}`);
+}
+
+// ---------------------------------------------------------------------
+// BOOT
+// ---------------------------------------------------------------------
+async function boot() {
+  const db = await openDB();
+  const blobStore = new BlobStore(db);
+  await blobStore.init();
+  storage = new StorageProvider(db, blobStore);
+  await storage.purgeOldTrash();
+  state.session = await storage.getSession();
+  state.folders = await storage.getFolders();
+  state.trashedFolders = await storage.getTrashedFolders();
+  state.trashedMedia = await storage.getTrashedMedia();
+  state.storageEstimate = await storage.getStorageEstimate();
+  state.ready = true;
+  render();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {/* not fatal in preview contexts */});
+  }
+}
+boot();
+</script>
+</body>
+</html>
