@@ -714,16 +714,18 @@ const state = {
 const appEl = document.getElementById('app');
 const toastEl = document.getElementById('toast');
 let toastTimer = null;
-// `undo`, if provided, is a function to call when the person taps Undo.
-// It gets ~5 seconds before the toast (and the option) disappears.
-function toast(msg, undo) {
-  pendingUndo = undo || null;
-  toastEl.innerHTML = undo
-    ? `<span>${escapeHtml(msg)}</span> <button data-action="toast-undo" style="margin-left:10px; background:none; border:none; color:#ffd479; font-weight:800; font-size:13.5px;">Undo</button>`
+// `action`, if provided, is a function to call when the person taps the
+// toast's action button (labelled `actionLabel`, default "Undo"). Giving
+// the action button more time (8s) matters for the share-queue flow below,
+// where the person needs a moment to notice "tap to continue".
+function toast(msg, action, actionLabel = 'Undo') {
+  pendingUndo = action || null;
+  toastEl.innerHTML = action
+    ? `<span>${escapeHtml(msg)}</span> <button data-action="toast-undo" style="margin-left:10px; background:none; border:none; color:#ffd479; font-weight:800; font-size:13.5px;">${escapeHtml(actionLabel)}</button>`
     : escapeHtml(msg);
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.classList.remove('show'); pendingUndo = null; }, 5000);
+  toastTimer = setTimeout(() => { toastEl.classList.remove('show'); pendingUndo = null; }, action ? 8000 : 5000);
 }
 
 function fmtDate(ts) {
@@ -1546,11 +1548,21 @@ async function refreshFoldersQuiet() {
 // ---------------------------------------------------------------------
 async function shareMediaItems(mediaItems) {
   if (!mediaItems || !mediaItems.length) { toast('Nothing to share'); return; }
+  if (!navigator.share) {
+    toast('Sharing isn\'t supported in this browser — try Chrome or Safari');
+    return;
+  }
   toast('Preparing…');
   const files = [];
-  for (const m of mediaItems) {
-    const file = await storage.getMediaFile(m);
-    if (file) files.push(file);
+  try {
+    for (const m of mediaItems) {
+      const file = await storage.getMediaFile(m);
+      if (file) files.push(file);
+    }
+  } catch (err) {
+    console.error('Socialset: failed reading media for share', err);
+    toast(`Couldn't read file: ${err && err.message ? err.message : err}`);
+    return;
   }
   if (!files.length) { toast('Could not load media'); return; }
 
@@ -1561,35 +1573,32 @@ async function shareMediaItems(mediaItems) {
       await navigator.share({ files, title: 'Socialset' });
       return;
     } catch (err) {
-      if (err && err.name === 'AbortError') return; // person cancelled the sheet
-      // fall through
+      if (err && err.name === 'AbortError') { toast('Cancelled'); return; }
+      console.error('Socialset: navigator.share (batch) failed', err);
+      // fall through — try single-file path below before giving up
     }
   }
 
   // 2) Chrome on Android frequently refuses canShare() for a *batch* of
   // files (mixed photo/video, combined size, etc.) even though each file
-  // shares fine on its own — and silently falling back to a plain download
-  // means "Share" never actually reaches Instagram/CapCut. So when more
-  // than one file was picked, share them one at a time instead: each opens
-  // its own share sheet, and only once you dismiss/complete it does the
-  // next one appear. Slower than one shared batch, but it actually reaches
-  // Instagram/CapCut instead of just downloading.
-  if (navigator.canShare && files.some(f => navigator.canShare({ files: [f] }))) {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!navigator.canShare({ files: [file] })) continue;
-      if (files.length > 1) toast(`Share ${i + 1} of ${files.length} — choose where to send it`);
-      try {
-        await navigator.share({ files: [file], title: file.name });
-      } catch (err) {
-        if (err && err.name === 'AbortError') continue; // skip to the next file
-      }
-    }
+  // shares fine on its own. The catch: browsers only honour navigator.share()
+  // as a response to a direct tap — call it a second time programmatically
+  // (e.g. in a for-loop) and it's silently blocked with no dialog at all,
+  // which is exactly the "Share 2 of 2 does nothing" bug. So instead of
+  // looping automatically, share the first file now (this tap), then ask
+  // for one more explicit tap per remaining file — that tap is what lets
+  // the next share sheet actually open.
+  const shareable = files.filter((f) => navigator.canShare && navigator.canShare({ files: [f] }));
+  if (shareable.length) {
+    await shareQueueStep(shareable, 0);
     return;
   }
 
-  // 3) Last resort (desktop browsers, or Web Share unsupported entirely):
-  // trigger a normal download for each file.
+  // 3) Web Share doesn't support these files at all on this browser/device
+  // (canShare returned false for every one) — fall back to a normal
+  // download so the media is at least reachable, and say so explicitly
+  // rather than leaving the person guessing why nothing opened.
+  toast('This browser can\'t share these files directly — downloading instead');
   for (const file of files) {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a');
@@ -1598,6 +1607,36 @@ async function shareMediaItems(mediaItems) {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
   toast(`Downloaded ${files.length} file${files.length === 1 ? '' : 's'}`);
+}
+
+// Shares files[index], then — if there are more — leaves a toast with a
+// "Share next" button. Tapping that button is a fresh user gesture, which
+// is what actually allows the *next* navigator.share() call to open a
+// dialog instead of being silently blocked by the browser.
+async function shareQueueStep(files, index) {
+  const file = files[index];
+  const remaining = files.length - index - 1;
+  try {
+    await navigator.share({ files: [file], title: file.name });
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      // person backed out of the sheet — not an error, just stop here
+      // rather than pushing them into the next file automatically.
+      return;
+    }
+    console.error('Socialset: navigator.share (single file) failed', err);
+    toast(`Couldn't open share sheet: ${err && err.name ? err.name : 'unknown error'}`);
+    return;
+  }
+  if (remaining > 0) {
+    toast(
+      `Shared ${index + 1} of ${files.length} — tap for the next`,
+      () => shareQueueStep(files, index + 1),
+      `Share next (${remaining})`
+    );
+  } else if (files.length > 1) {
+    toast('All shared');
+  }
 }
 
 // ---------------------------------------------------------------------
